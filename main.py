@@ -1,8 +1,8 @@
-from PyQt5 import QtCore, QtGui, QtWidgets, uic, QtSerialPort
-from PyQt5.QtCore import QIODevice, QTimer, pyqtSignal
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-from pyqtgraph import PlotWidget
-import pyqtgraph as pg
+from PyQt5 import QtGui, QtWidgets, uic, QtSerialPort
+from PyQt5.QtCore import QTimer
+
+from pyqtgraph.opengl import GLMeshItem, GLLinePlotItem, MeshData
+from pyqtgraph import Transform3D
 import sys
 from random import randint
 
@@ -16,6 +16,10 @@ import serial
 import json
 import time
 
+import numpy as np
+from filterpy.kalman import KalmanFilter
+from stl import mesh
+
 class MainWindow(QtWidgets.QMainWindow):
     connected = False
     ser = serial.Serial()
@@ -23,6 +27,8 @@ class MainWindow(QtWidgets.QMainWindow):
     serialBaud = False
     dummyPlug = False
     saving = False
+    fileName = 'save_'+str(time.time())+'.txt'
+    file_handle = None
     _now = 0
     _sleep_time = 0
 
@@ -54,6 +60,39 @@ class MainWindow(QtWidgets.QMainWindow):
         self.map = Map(self.widget_map)
         self.map.coordinate_changed.connect(self.map.add_marker)
 
+        #3d vizuaalizer
+        stl_mesh = mesh.Mesh.from_file('rocket2.stl')
+        points = stl_mesh.points.reshape(-1, 3)
+        faces = np.arange(points.shape[0]).reshape(-1, 3)
+
+        mesh_data = MeshData(vertexes=points, faces=faces)
+
+        self.cube = GLMeshItem(meshdata=mesh_data, smooth=True, drawFaces=False, drawEdges=True, edgeColor=(0, 1, 0, 1))
+
+        axis_length = 2.0
+        self.axis_x = GLLinePlotItem(pos=np.array([[0, 0, 0], [axis_length, 0, 0]]), color=(1, 0, 0, 1))
+        self.axis_y = GLLinePlotItem(pos=np.array([[0, 0, 0], [0, axis_length, 0]]), color=(0, 1, 0, 1))
+        self.axis_z = GLLinePlotItem(pos=np.array([[0, 0, 0], [0, 0, axis_length]]), color=(0, 0, 1, 1))
+        self.visualizer.addItem(self.axis_x)
+        self.visualizer.addItem(self.axis_y)
+        self.visualizer.addItem(self.axis_z)
+        self.visualizer.addItem(self.cube)
+
+        camera_position = self.visualizer.cameraPosition()
+        print(camera_position)
+        camera_position[2] = 150  # Mettez à jour la distance de la caméra
+        camera_position[1] = 100  # Mettez à jour la distance de la caméra
+        camera_position[0] = 100  # Mettez à jour la distance de la caméra
+        print(camera_position)
+        self.visualizer.setCameraPosition(pos=camera_position)
+
+        self.kalman_filter = KalmanFilter(dim_x=3, dim_z=3)
+        self.kalman_filter.F = np.eye(3)  # Matrice de transition d'état
+        self.kalman_filter.H = np.eye(3)  # Matrice d'observation
+        self.kalman_filter.P *= 1e3  # Matrice de covariance d'état initiale
+        self.kalman_filter.R *= 0.01  # Matrice de covariance d'observation
+        self.kalman_filter.Q *= 0.1  # Matrice de covariance du bruit du processus
+
         # Timer
         self.populateTimer = QTimer(self)
         self.populateTimer.setInterval(100)
@@ -84,6 +123,8 @@ class MainWindow(QtWidgets.QMainWindow):
                         self.gyro.update(data['mpu']['gyro_x'], data['mpu']['gyro_y'],
                                     data['mpu']['gyro_z'])
 
+                        self.update_cube_rotation(data['quat']['quat_w'], data['quat']['quat_x'], data['quat']['quat_y'], data['quat']['quat_z'])
+
                         self.temperature.update(round(data['mpu']['temp'], 1))
                         if 'gps' in data:
                             self.alt.update(data['GPS']['altitude_m'])
@@ -100,7 +141,9 @@ class MainWindow(QtWidgets.QMainWindow):
                             self.label_vdop.setText(str(data['GPS']['VDOP']))
                             self.label_pdop.setText(str(data['GPS']['PDOP']))
                             self.label_hdop.setText(str(data['GPS']['HDOP']))
-                        # data_base.guardar(data)
+                        if self.saving and self.file_handle:
+                            self.file_handle.write(value + '\n')
+
                 except ValueError as e:
                     print(value_chain)
                     print('json errone')
@@ -109,7 +152,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
             except IndexError:
                 print('starting, please wait a moment')
-
 
     def button_connect_serial(self):
         self.serialPort = self.comboBox_serialPort.currentText()
@@ -129,7 +171,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.label_status.setText("connected")
         self.connected = True
 
-
         if self.connected:
             self.comboBox_serialPort.setEnabled(False)
             self.comboBox_baudRate.setEnabled(False)
@@ -137,12 +178,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def saving_data(self):
         self.saving = not self.saving
+
+        if self.saving:
+            # nouveau fichier
+            self.fileName = f"save_{int(time.time())}.txt"
+            self.file_handle = open(self.fileName, "a", buffering=1)  # ligne-buffering
+            self.label_saving_state.setText("Recording data…")
+        else:
+            if self.file_handle:
+                self.file_handle.close()
+                self.file_handle = None
+            self.label_saving_state.setText("Not recording")
+
         self.pushButton_start_save.setEnabled(not self.saving)
         self.pushButton_stop_save.setEnabled(self.saving)
-        if self.saving:
-            self.label_saving_state.setText("Recording data...")
-        else:
-            self.label_saving_state.setText("Not recording")
 
     def getData(self):
         data = ''
@@ -153,6 +202,19 @@ class MainWindow(QtWidgets.QMainWindow):
             if data:
                 value_chain = data.decode("utf-8").splitlines()
         return value_chain
+
+    def update_cube_rotation(self, w, x, y, z):
+        q = np.array([w, x, y, z], dtype=float)
+        q /= np.linalg.norm(q)
+
+        # Qt veut (x,y,z,w)
+        qt = QtGui.QQuaternion(q[1], q[2], q[3], q[0])
+        m4 = QtGui.QMatrix4x4();
+        m4.rotate(qt)
+        t = Transform3D(m4)
+
+        for item in (self.cube, self.axis_x, self.axis_y, self.axis_z):
+            item.setTransform(t)
 
 
 def main():

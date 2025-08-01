@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1188</width>
-    <height>885</height>
+    <width>1449</width>
+    <height>900</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -79,7 +79,7 @@
    <widget class="Line" name="line">
     <property name="geometry">
      <rect>
-      <x>910</x>
+      <x>900</x>
       <y>0</y>
       <width>20</width>
       <height>1021</height>
@@ -92,7 +92,7 @@
    <widget class="QGroupBox" name="groupBox">
     <property name="geometry">
      <rect>
-      <x>930</x>
+      <x>1190</x>
       <y>10</y>
       <width>251</width>
       <height>151</height>
@@ -193,8 +193,8 @@
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
      <rect>
-      <x>930</x>
-      <y>170</y>
+      <x>1190</x>
+      <y>160</y>
       <width>251</width>
       <height>111</height>
      </rect>
@@ -242,24 +242,11 @@
      </property>
     </widget>
    </widget>
-   <widget class="Line" name="line_2">
-    <property name="geometry">
-     <rect>
-      <x>930</x>
-      <y>290</y>
-      <width>251</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="orientation">
-     <enum>Qt::Horizontal</enum>
-    </property>
-   </widget>
    <widget class="QGroupBox" name="groupBox_3">
     <property name="geometry">
      <rect>
       <x>930</x>
-      <y>310</y>
+      <y>10</y>
       <width>251</width>
       <height>211</height>
      </rect>
@@ -476,32 +463,6 @@
      </property>
     </widget>
    </widget>
-   <widget class="QGroupBox" name="groupBox_4">
-    <property name="geometry">
-     <rect>
-      <x>930</x>
-      <y>520</y>
-      <width>251</width>
-      <height>101</height>
-     </rect>
-    </property>
-    <property name="title">
-     <string>GroupBox</string>
-    </property>
-   </widget>
-   <widget class="QGroupBox" name="groupBox_5">
-    <property name="geometry">
-     <rect>
-      <x>930</x>
-      <y>620</y>
-      <width>251</width>
-      <height>101</height>
-     </rect>
-    </property>
-    <property name="title">
-     <string>GroupBox</string>
-    </property>
-   </widget>
    <widget class="QWebEngineView" name="widget_map" native="true">
     <property name="geometry">
      <rect>
@@ -509,6 +470,16 @@
       <y>300</y>
       <width>601</width>
       <height>581</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="GLViewWidget" name="visualizer" native="true">
+    <property name="geometry">
+     <rect>
+      <x>920</x>
+      <y>280</y>
+      <width>521</width>
+      <height>601</height>
      </rect>
     </property>
    </widget>
@@ -524,7 +495,13 @@
   <customwidget>
    <class>QWebEngineView</class>
    <extends>QWidget</extends>
-   <header location="global">qwebengineview.h</header>
+   <header>qwebengineview.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>GLViewWidget</class>
+   <extends>QWidget</extends>
+   <header>pyqtgraph.opengl</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
